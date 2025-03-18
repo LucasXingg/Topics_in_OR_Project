@@ -1,4 +1,4 @@
-from utils import utils
+# from utils import utils
 
 import numpy as np
 import gurobipy as gp
@@ -29,6 +29,7 @@ class OR_model:
         """
         self.model = None  # Initialize model attribute
         self.is_loaded_model = False
+        self.is_load_sol = False
 
         if model_path and df is not None and utils is not None:
 
@@ -52,7 +53,10 @@ class OR_model:
             else:
                 try:
                     self.model.read(sol_path)  # Apply solution values to the model
+                    self.model.params.SolutionNumber = 0
                     print(f"Solution loaded successfully from '{sol_path}'")
+                    print(f"Solution count after loading: {self.model.SolCount}")
+                    self.is_load_sol = True
                 except Exception as e:
                     print(f"Failed to load solution file: {e}")
 
@@ -122,6 +126,10 @@ class OR_model:
 
         for b1 in B:  # This constraint makes sure that each block can only move to one place
             self.model.addConstr(gp.quicksum(x_p[p] for p in self.P if b1 == self.utils.getBs(p)[0]) == 1)
+
+        for d in W: # Weekday
+            if not d == 4:
+                self.model.addConstr()
 
         print(f"Finish, uses {time.time() - start:.5f} seconds")
 
@@ -210,14 +218,14 @@ class OR_model:
 
     def printResults(self, ignore_0=True):
         """Prints all decision variables and their values."""
-        if self.model.status == GRB.OPTIMAL:
+        if self.model.status == GRB.OPTIMAL or self.is_load_sol:
             print("\nOptimal Solution Found!")
 
             # Iterate through all decision variables in the model
             print("\nDecision Variables:")
             for var in self.model.getVars():
-                if ignore_0 and var.x > 0.5:
-                    print(f"{var.varName} = {var.x}")
+                if ignore_0 and var.X > 0.5:
+                    print(f"{var.varName} = {var.X}")
 
         elif self.model.status == GRB.INFEASIBLE:
             print("\nNo feasible solution found. The model is infeasible.")
@@ -248,7 +256,7 @@ class OR_model:
             b1 = bs[0]
             b2 = bs[1]
             bed, week_num = self.utils.casesWeek(b1)
-            d2, o2 = utils.getDayOR(b2)
+            # d2, o2 = utils.getDayOR(b2)
             for i in range(4):
                 line_idx = self.df[(self.df['Block'] == b2) & (self.df['Week Number'] == week_num[i])].index
                 new_bed[line_idx[0]] = bed[i]
@@ -260,8 +268,8 @@ class OR_model:
         weekday_daycount_re_mat = np.zeros((4,7))
 
         for week in range(1,5):
-            weekn = df['Week Number'] == week
-            df_weekn = df[weekn]
+            weekn = self.df['Week Number'] == week
+            df_weekn = self.df[weekn]
             
             weekday_daycount = []
             for d in range(1, 8):
@@ -286,10 +294,18 @@ class OR_model:
         for weekday in range(7):
             weekday_daycount_avg[weekday] = weekday_daycount_mat[:,weekday].mean()
             weekday_daycount_re_avg[weekday] = weekday_daycount_re_mat[:,weekday].mean()
-            
+
+        weekday_daycount_avg_tmp = weekday_daycount_avg.copy()
+        weekday_daycount_re_avg_tmp = weekday_daycount_re_avg.copy()
+
+        weekday_daycount_avg = np.concatenate(([weekday_daycount_avg_tmp[-1]], weekday_daycount_avg_tmp[:-1]))
+        weekday_daycount_re_avg = np.concatenate(([weekday_daycount_re_avg_tmp[-1]], weekday_daycount_re_avg_tmp[:-1]))
+
+        print(weekday_daycount_avg_tmp)
+        print(weekday_daycount_avg)
 
         # Define labels for better readability
-        day_labels = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        day_labels = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 
         # Count occurrences of each day
         day_counts = weekday_daycount_avg
@@ -393,8 +409,10 @@ if __name__ == "__main__":
     
     df, utils = readData(pre=False)
 
-    model = OR_model(df=df, utils=utils, model_path="./saves/alpha_0d5")
+    model = OR_model(df=df, utils=utils, model_path="./saves/alpha_0d4")
 
-    model.optimize()
+    # model.optimize()
+
+    model.printResults()
 
     model.resultChart()
