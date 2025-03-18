@@ -3,6 +3,12 @@ import pandas as pd
 class utils:
 
     def __init__(self, df: pd.DataFrame, pre=True):
+        """
+        Parameters:
+        - df: DataFrame (Optional, required if creating a new model)
+        - pre: bool (Optional, default=True)
+            If True, do precompute to avoid redudant computation when loop setting constraints.
+        """
         self.df = df
         if pre:
             self.preCompute()
