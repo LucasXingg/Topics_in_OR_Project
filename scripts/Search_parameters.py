@@ -26,7 +26,6 @@ def readData():
 
     return df, utils_
 
-
 def getAllowedMoves(df, utils):
     B = df['Block'].unique()
     P_set = set()

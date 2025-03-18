@@ -2,9 +2,10 @@ import pandas as pd
 
 class utils:
 
-    def __init__(self, df: pd.DataFrame):
+    def __init__(self, df: pd.DataFrame, pre=True):
         self.df = df
-        self.preCompute()
+        if pre:
+            self.preCompute()
  
 
     def getRoom(self, b):

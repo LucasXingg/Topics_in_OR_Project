@@ -6,38 +6,54 @@ import os
 
 class OR_model:
 
-    def __init__(self, df=None, P=None, F=None, l_v=None, u_v=None, alpha = 0, utils=None, model_path=None):
+    def __init__(self, df=None, P=None, F=None, l_v=None, u_v=None, alpha=0, utils=None, model_path=None):
         """
-        Initializes OR_model. Either loads a model from a file or sets up a new model.
+        Initializes OR_model. Either loads a model (and solution) from files or sets up a new model.
 
         Parameters:
         - df: DataFrame (Optional, required if creating a new model)
         - P: List of allowed moves (Optional, required if creating a new model)
         - F: List of floors (Optional, required if creating a new model)
-        - l_v: List of lower bound of service v (Optional, required if creating a new model)
-        - u_v: List of upper bound of service v (Optional, required if creating a new model)
-        - alpha: Penalty term of amount of moving blocks
+        - l_v: List of lower bounds of service v (Optional, required if creating a new model)
+        - u_v: List of upper bounds of service v (Optional, required if creating a new model)
+        - alpha: Penalty term of the amount of moving blocks
         - utils: Utilities object (Optional, required if creating a new model)
-        - model_path: File path to a saved Gurobi model (MPS, LP, JSON)
+        - model_path: File path to a saved Gurobi model (MPS, LP, SAV)
+        - sol_path: Optional path to a Gurobi solution file (.sol) to load solution values
         """
         self.model = None  # Initialize model attribute
         self.is_loaded_model = False
 
-        if model_path and df:
+        if model_path and df is not None:
+
+            self.df = df
+
+            sol_path = f"{model_path}.sol"
+            model_path = f"{model_path}.mps"
             # Load model from file
             if not os.path.exists(model_path):
                 raise FileNotFoundError(f"Model file '{model_path}' not found.")
-            
-            print("\n\n", "-"*10, f"Loading model from '{model_path}'...", "-"*10)
-            
+
+            print("\n\n", "-" * 10, f"Loading model from '{model_path}'...", "-" * 10)
             self.model = gp.read(model_path)  # Load Gurobi model
             self.is_loaded_model = True
             print("Model loaded successfully!")
+
+            # Try to load the solution
+            if not os.path.exists(sol_path):
+                print(f"Solution file '{sol_path}' not found. Skipping solution load.")
+            else:
+                try:
+                    self.model.read(sol_path)  # Apply solution values to the model
+                    print(f"Solution loaded successfully from '{sol_path}'")
+                except Exception as e:
+                    print(f"Failed to load solution file: {e}")
+
         else:
             # Initialize a new model
             if df is None or P is None or F is None or l_v is None or u_v is None or utils is None:
                 raise ValueError("Missing required parameters for creating a new model.")
-            
+
             self.df = df
             self.P = P
             self.F = F
@@ -46,9 +62,7 @@ class OR_model:
             self.alpha = alpha
             self.utils = utils
 
-
-            print("\n\n", "-"*10, "Creating model", "-"*10)
-
+            print("\n\n", "-" * 10, "Creating model", "-" * 10)
             # Create a new Gurobi model
             self.model = gp.Model("OR opt")
             print("New model created successfully.")
@@ -170,8 +184,8 @@ class OR_model:
 
 
     def optimize(self):
-        if self.is_loaded_model:
-            raise RuntimeError("Cannot optimize a loaded model.")
+        # if self.is_loaded_model:
+        #     raise RuntimeError("Cannot optimize a loaded model.")
         # Optimize the model
         print("\n\n", "-"*10, "Optimizing", "-"*10)
         start = time.time()
@@ -187,7 +201,7 @@ class OR_model:
 
 
 
-    def printResults(self):
+    def printResults(self, ignore_0=True):
         """Prints all decision variables and their values."""
         if self.model.status == GRB.OPTIMAL:
             print("\nOptimal Solution Found!")
@@ -195,7 +209,8 @@ class OR_model:
             # Iterate through all decision variables in the model
             print("\nDecision Variables:")
             for var in self.model.getVars():
-                print(f"{var.varName} = {var.x}")
+                if ignore_0 and var.x > 0.5:
+                    print(f"{var.varName} = {var.x}")
 
         elif self.model.status == GRB.INFEASIBLE:
             print("\nNo feasible solution found. The model is infeasible.")
@@ -224,31 +239,32 @@ class OR_model:
 
 
 
-    def saveModel(self, filename="or_model", format="mps"):
+    def saveModel(self, filename="or_model"):
         """
-        Saves the Gurobi model to a file.
+        Saves the Gurobi model and its solution to .mps and .sol files.
 
-        Parameters:
-        - filename (str): Name of the file (without extension).
-        - format (str): Format of the file ('mps', 'lp', 'json', 'sol').
+        - Model is saved as 'filename.mps'
+        - Solution (if available) is saved as 'filename.sol'
         """
-        print("\n\n", "-"*10, "Saving model", "-"*10)
+        print("\n\n", "-" * 10, "Saving model and solution", "-" * 10)
 
         if not hasattr(self, "model") or self.model is None:
             print("No model found to save.")
             return
 
-        # Define valid formats
-        valid_formats = {"mps", "lp", "json", "sol"}
-
-        if format not in valid_formats:
-            print(f"Invalid format '{format}'. Using default 'mps'.")
-            format = "mps"
-
-        filepath = f"{filename}.{format}"
-
         try:
-            self.model.write(filepath)
-            print(f"Model saved successfully as '{filepath}'")
+            # Save the model in .mps format
+            model_path = f"{filename}.mps"
+            self.model.write(model_path)
+            print(f"Model saved successfully as '{model_path}'")
+
+            # Check if the model has been solved and has a solution
+            if self.model.SolCount > 0:
+                sol_path = f"{filename}.sol"
+                self.model.write(sol_path)
+                print(f"Solution saved successfully as '{sol_path}'")
+            else:
+                print("No solution found. Skipping saving solution file.")
+
         except Exception as e:
-            print(f"Failed to save model: {e}")
+            print(f"Failed to save model or solution: {e}")
