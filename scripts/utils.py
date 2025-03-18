@@ -8,18 +8,38 @@ class utils:
             self.preCompute()
  
 
-    def getRoom(self, b):
+    @staticmethod
+    def getRoom(b):
         room = b.split('o')[1][0:-1]
         return int(room)
 
-    def getDay(self, b):
+
+    @staticmethod
+    def getDay(b):
         day = b.split('d')[1][0]
         return int(day)
+
+
+    @staticmethod
+    def getBs(p):
+        b1, b2 = p
+        return [b1, b2]
+
+    @staticmethod
+    def getDayOR(b):
+        day = b.split('d')[1][0]
+        room = b.split('o')[1][0]
+        return int(day), int(room)
 
 
     def cases(self, b):
         line = self.df[(self.df['Block'] == b)]
         return list(line['Beds'])
+
+
+    def casesWeek(self, b):
+        line = self.df[(self.df['Block'] == b)]
+        return list(line['Beds']), list(line['Week Number'])
 
 
     def alloc(self, b, v):
@@ -32,10 +52,6 @@ class utils:
         return not line.empty  # Returns True if at least one row exists
 
 
-    def getBs(self, p):
-        b1, b2 = p
-        return [b1, b2]
-    
     def preCompute(self):
         """
         Do precompute to avoid redudant computation when loop setting constraints.

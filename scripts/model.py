@@ -1,8 +1,14 @@
-import time
+from utils import utils
+
+import numpy as np
 import gurobipy as gp
 from gurobipy import GRB
+import matplotlib.pyplot as plt
+
 import gc
 import os
+import re
+import time
 
 class OR_model:
 
@@ -24,9 +30,10 @@ class OR_model:
         self.model = None  # Initialize model attribute
         self.is_loaded_model = False
 
-        if model_path and df is not None:
+        if model_path and df is not None and utils is not None:
 
             self.df = df
+            self.utils = utils
 
             sol_path = f"{model_path}.sol"
             model_path = f"{model_path}.mps"
@@ -221,6 +228,88 @@ class OR_model:
         else:
             print("\nNo optimal solution found. Model status:", self.model.status)
 
+    def resultChart(self):
+        # Apply rearrangement
+        df_rearrange = self.df.copy()
+        m = self.df.shape[0]
+
+        rearrangements = []
+        new_bed = np.zeros(m, dtype='int')
+
+        for var in self.model.getVars():
+            if var.VarName.startswith("x_p"):
+                if var.x > 0.5:  # Binary, so check if it's 1
+                    # Log all pairs of b1 and b2
+                    b1, b2 = re.findall(r'\([^\(\)]*\)', var.VarName)
+                    rearrangements.append([b1,b2])
+
+        # Moving beds value from original dataset to new dataset according to resulting moves.
+        for bs in rearrangements:
+            b1 = bs[0]
+            b2 = bs[1]
+            bed, week_num = self.utils.casesWeek(b1)
+            d2, o2 = utils.getDayOR(b2)
+            for i in range(4):
+                line_idx = self.df[(self.df['Block'] == b2) & (self.df['Week Number'] == week_num[i])].index
+                new_bed[line_idx[0]] = bed[i]
+
+        df_rearrange['Beds'] = new_bed
+
+        # colculate daycount for each weekn
+        weekday_daycount_mat = np.zeros((4,7))
+        weekday_daycount_re_mat = np.zeros((4,7))
+
+        for week in range(1,5):
+            weekn = df['Week Number'] == week
+            df_weekn = df[weekn]
+            
+            weekday_daycount = []
+            for d in range(1, 8):
+                day_count = df_weekn[df_weekn['Weekday'] == d]['Beds'].sum()
+                weekday_daycount.append(day_count)
+            
+            weekday_daycount_mat[week-1,:] = weekday_daycount
+            
+            weekn_re = df_rearrange['Week Number'] == week
+            df_weekn_re = df_rearrange[weekn_re]
+            
+            weekday_daycount_re = []
+            for d in range(1, 8):
+                day_count = df_weekn_re[df_weekn_re['Weekday'] == d]['Beds'].sum()
+                weekday_daycount_re.append(day_count)
+
+            weekday_daycount_re_mat[week-1,:] = weekday_daycount_re
+
+        weekday_daycount_avg = np.zeros(7)
+        weekday_daycount_re_avg = np.zeros(7)
+
+        for weekday in range(7):
+            weekday_daycount_avg[weekday] = weekday_daycount_mat[:,weekday].mean()
+            weekday_daycount_re_avg[weekday] = weekday_daycount_re_mat[:,weekday].mean()
+            
+
+        # Define labels for better readability
+        day_labels = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+        # Count occurrences of each day
+        day_counts = weekday_daycount_avg
+        day_counts_re = weekday_daycount_re_avg
+
+        # Plot using Matplotlib
+        plt.figure(figsize=(8, 8))
+        plt.plot(range(7), day_counts, label='Current census')
+        plt.plot(range(7), day_counts_re, label='Permuted census')
+
+        # Set labels
+        plt.xticks(ticks=range(7), labels=day_labels, rotation=45)
+        plt.xlabel("Day of the Week")
+        plt.ylabel("Beds")
+        plt.ylim(250, 350)
+        plt.legend()
+
+        # Show plot
+        plt.show()
+
 
 
 
@@ -268,3 +357,44 @@ class OR_model:
 
         except Exception as e:
             print(f"Failed to save model or solution: {e}")
+
+if __name__ == "__main__":
+    
+    import pandas as pd
+    from utils import utils
+    import itertools
+
+    def readData(pre=True):
+        print("\n\n", "-"*10, "Reading data", "-"*10)
+        df = pd.read_csv('dataset.csv')
+
+        print("Data size:", df.shape)
+
+        print("\n\n", "-"*10, "Do precalculations", "-"*10)
+        start = time.time()
+
+        utils_ = utils(df, pre=pre)
+
+        print(f"Finish, uses {time.time() - start:.5f} seconds")
+
+        return df, utils_
+    
+    def getAllowedMoves(df, utils):
+        B = df['Block'].unique()
+        P_set = set()
+
+        for b1, b2 in itertools.product(B, repeat=2):
+            o1 = utils.getRoom(b1)
+            o2 = utils.getRoom(b2)
+            if abs(o1 - o2) <= 10:
+                P_set.add((b1,b2))
+
+        return list(P_set)
+    
+    df, utils = readData(pre=False)
+
+    model = OR_model(df=df, utils=utils, model_path="./saves/alpha_0d5")
+
+    model.optimize()
+
+    model.resultChart()
