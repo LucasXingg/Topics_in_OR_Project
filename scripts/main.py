@@ -16,7 +16,15 @@ def readData():
     df = pd.read_csv('dataset.csv')
 
     print("Data size:", df.shape)
-    return df
+
+    print("\n\n", "-"*10, "Do precalculations", "-"*10)
+    start = time.time()
+
+    utils_ = utils(df)
+
+    print(f"Finish, uses {time.time() - start:.5f} seconds")
+
+    return df, utils_
 
 
 def getAllowedMoves(df, utils):
@@ -34,8 +42,7 @@ def getAllowedMoves(df, utils):
 
 
 if __name__ == "__main__":
-    df = readData()
-    utils = utils(df)
+    df, utils = readData()
     P = getAllowedMoves(df, utils)
 
     # Hyperparameters

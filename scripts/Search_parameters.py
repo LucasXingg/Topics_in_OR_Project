@@ -16,7 +16,15 @@ def readData():
     df = pd.read_csv('dataset.csv')
 
     print("Data size:", df.shape)
-    return df
+
+    print("\n\n", "-"*10, "Do precalculations", "-"*10)
+    start = time.time()
+
+    utils_ = utils(df)
+
+    print(f"Finish, uses {time.time() - start:.5f} seconds")
+
+    return df, utils_
 
 
 def getAllowedMoves(df, utils):
@@ -34,22 +42,34 @@ def getAllowedMoves(df, utils):
 
 
 if __name__ == "__main__":
-    df = readData()
-    utils = utils(df)
+    df, utils = readData()
+    
     P = getAllowedMoves(df, utils)
 
     # Hyperparameters
     F = ['1']
     l_v = [0,0,0,0,0]
+    u_v = [48,48,48,48,48]
 
-    for i in range(15):
-        u_v_ = 150 - 10 * i
-        u_v = [u_v_] * 5
-        model = OR_model(df=df, P=P, F=F, l_v=l_v, u_v=u_v, utils=utils)
+    iter = 0
+
+    alphas = np.linspace(0, 1, num=20)
+
+    for alpha in alphas:
+        print("\n\n\n\n\n")
+        print("-"*40)
+        print("-"*40)
+        print(f"\nSet alpha as {alpha}\n")
+        print("-"*40)
+        print("-"*40, "\n\n")
+        model = OR_model(df=df, P=P, F=F, l_v=l_v, u_v=u_v, alpha=alpha, utils=utils)
         model.init()
         model.optimize()
-        model.saveModel(filename=f"saves/param_search_model{u_v_}")
+        model.saveModel(filename=f"./saves/alpha_search_model{alpha}")
         model.destroy()
+        print("-"*10, f"iter {iter} finished", "-"*10)
+        iter += 1
+
 
 
 
