@@ -99,6 +99,18 @@ class OR_model:
         print(f"Finish, uses {time.time() - start:.5f} seconds")
 
 
+        # Thursday
+
+        t_d = self.model.addVars(W, vtype=GRB.BINARY, name="t_d")
+
+        self.model.addConstr(gp.quicksum(t_d[d] for d in W) == 1)
+
+        for p in self.P:
+            if self.utils.getDay(self.utils.getBs(p)[0]) == 4:
+                p_d = self.utils.getDay(self.utils.getBs(p)[1]) # destination day
+                self.model.addConstr(x_p[p] <= t_d[p_d])
+
+
         # (2)
 
         print("Setting constraints (2)")
