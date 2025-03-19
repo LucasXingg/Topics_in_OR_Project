@@ -101,14 +101,14 @@ class OR_model:
 
         # Thursday
 
-        t_d = self.model.addVars(W, vtype=GRB.BINARY, name="t_d")
+        # t_d = self.model.addVars(W, vtype=GRB.BINARY, name="t_d")
 
-        self.model.addConstr(gp.quicksum(t_d[d] for d in W) == 1)
+        # self.model.addConstr(gp.quicksum(t_d[d] for d in W) == 1)
 
-        for p in self.P:
-            if self.utils.getDay(self.utils.getBs(p)[0]) == 4:
-                p_d = self.utils.getDay(self.utils.getBs(p)[1]) # destination day
-                self.model.addConstr(x_p[p] <= t_d[p_d])
+        # for p in self.P:
+        #     if self.utils.getDay(self.utils.getBs(p)[0]) == 4:
+        #         p_d = self.utils.getDay(self.utils.getBs(p)[1]) # destination day
+        #         self.model.addConstr(x_p[p] <= t_d[p_d])
 
 
         # (2)
