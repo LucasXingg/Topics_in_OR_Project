@@ -76,7 +76,7 @@ class ResultData:
                 print(f"{var_name} = {value}")
 
 
-    def plot(self):
+    def plot(self, title=None, save=None):
         """
         Display a chart comparing current and permuted census based on the results data.
         """
@@ -154,6 +154,15 @@ class ResultData:
         plt.ylabel("Beds")
         plt.ylim(250, 350)
         plt.legend()
+        plt.tight_layout()
+
+        if title:
+            plt.title(title)
+
+        if save:
+            plt.savefig(save, facecolor='white', dpi=300)
 
         # Show plot
         plt.show()
+
+
